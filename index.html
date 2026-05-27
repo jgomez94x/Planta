@@ -1,0 +1,199 @@
+<!doctype html>
+<html lang="es">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+    <title>Control de Planta Westinghouse iGen5000</title>
+    <meta name="theme-color" content="#005eb8">
+    <link rel="manifest" href="%BASE_URL%manifest.webmanifest">
+    <link rel="apple-touch-icon" href="%BASE_URL%icon.svg">
+    <link rel="stylesheet" href="styles.css">
+  </head>
+  <body>
+    <header class="topbar">
+      <div>
+        <p class="eyebrow">Westinghouse iGen5000</p>
+        <h1>Control de planta</h1>
+      </div>
+      <div class="status-pill" id="saveStatus">Modo local provisional</div>
+    </header>
+
+    <main class="app-shell">
+      <section class="tab-panel active" id="tab-inicio">
+        <section class="dashboard-grid" aria-label="Resumen rapido">
+          <article class="dash-card">
+            <span>Horas totales</span>
+            <strong id="totalHours">0.0</strong>
+          </article>
+          <article class="dash-card">
+            <span>Ultimo uso</span>
+            <strong id="lastUse">Sin uso</strong>
+          </article>
+          <article class="dash-card wide">
+            <span>Proximo mantenimiento</span>
+            <strong id="urgentTask">Sin pendientes</strong>
+          </article>
+          <article class="dash-card wide" id="generalStatusCard">
+            <span>Estado general</span>
+            <strong id="generalStatus">Todo al dia</strong>
+          </article>
+        </section>
+
+        <section class="home-card">
+          <form id="hoursForm" class="hours-form">
+            <fieldset class="person-picker">
+              <legend>Registrado por</legend>
+              <label>
+                <input type="radio" name="registeredBy" value="Ana" checked>
+                <span>Ana</span>
+              </label>
+              <label>
+                <input type="radio" name="registeredBy" value="Jesus">
+                <span>Jesus</span>
+              </label>
+            </fieldset>
+            <label>
+              Agregar horas manualmente
+              <input id="hoursInput" type="number" min="0.1" step="0.1" inputmode="decimal" placeholder="0.0">
+            </label>
+            <button type="submit">Sumar horas</button>
+          </form>
+          <button id="demoResetBtn" class="ghost-button" type="button">Reiniciar demo</button>
+        </section>
+
+        <section id="alertsPanel" class="alerts-panel"></section>
+        <section id="batteryCard" class="battery-card"></section>
+
+        <section class="panel">
+          <div class="section-title">
+            <div>
+              <p class="eyebrow">Seguimiento</p>
+              <h2>Proximos mantenimientos</h2>
+            </div>
+          </div>
+          <div id="nextTasks" class="task-list"></div>
+        </section>
+
+        <section class="panel">
+          <div class="section-title">
+            <div>
+              <p class="eyebrow">Historial</p>
+              <h2>Horas agregadas</h2>
+            </div>
+          </div>
+          <div id="usageHistory" class="history"></div>
+        </section>
+      </section>
+
+      <section class="tab-panel" id="tab-servicios">
+        <article class="panel">
+          <div class="section-title">
+            <div>
+              <p class="eyebrow">Servicios</p>
+              <h2>Marcar mantenimiento</h2>
+            </div>
+          </div>
+          <div id="serviceCards" class="service-cards"></div>
+        </article>
+
+        <article class="panel">
+          <div class="section-title">
+            <div>
+              <p class="eyebrow">Historial</p>
+              <h2>Horas agregadas</h2>
+            </div>
+          </div>
+          <div id="usageHistoryServices" class="history"></div>
+        </article>
+
+        <article class="panel">
+          <div class="section-title">
+            <div>
+              <p class="eyebrow">Historial</p>
+              <h2>Por mantenimiento</h2>
+            </div>
+          </div>
+          <div id="serviceHistory" class="service-groups"></div>
+        </article>
+      </section>
+
+      <section class="tab-panel" id="tab-manual">
+        <article class="panel">
+          <div class="section-title">
+            <div>
+              <p class="eyebrow">Buscador del manual</p>
+              <h2>Consulta rapida</h2>
+            </div>
+          </div>
+          <div id="manualQuickButtons" class="quick-topic-buttons"></div>
+          <input id="searchInput" class="search" type="search" placeholder="Busca aceite, horas, bateria, gasolina...">
+          <div id="searchResults" class="search-results"></div>
+        </article>
+
+        <article class="panel">
+          <div class="section-title">
+            <div>
+              <p class="eyebrow">Diagnostico rapido</p>
+              <h2>Que esta pasando?</h2>
+            </div>
+          </div>
+          <div id="symptomButtons" class="quick-topic-buttons"></div>
+          <div id="symptomResult" class="search-results"></div>
+        </article>
+      </section>
+
+      <section class="tab-panel" id="tab-mas">
+        <article class="panel">
+          <div class="section-title">
+            <div>
+              <p class="eyebrow">Cuidados rapidos</p>
+              <h2>Recordatorios importantes</h2>
+            </div>
+          </div>
+          <div id="careCards" class="care-cards"></div>
+        </article>
+
+        <article class="panel">
+          <div class="section-title">
+            <div>
+              <p class="eyebrow">Compras y consumibles</p>
+              <h2>Aceite y repuestos exactos</h2>
+            </div>
+          </div>
+          <div id="partsList" class="parts-list"></div>
+        </article>
+
+        <article class="panel">
+          <div class="section-title">
+            <div>
+              <p class="eyebrow">Respaldo</p>
+              <h2>Registro provisional</h2>
+            </div>
+          </div>
+          <div class="backup-actions">
+            <button id="exportBtn" type="button">Exportar JSON</button>
+            <button id="exportTextBtn" type="button">Resumen texto</button>
+            <label class="file-button">
+              Importar
+              <input id="importInput" type="file" accept="application/json">
+            </label>
+            <button id="resetBtn" class="danger" type="button">Reiniciar</button>
+            <button id="editModeBtn" class="ghost-button" type="button">Edición</button>
+          </div>
+          <p class="fine-print">Los datos se guardan en este dispositivo. Usa exportar/importar para respaldar o mover el registro.</p>
+        </article>
+      </section>
+    </main>
+
+    <div id="toast" class="toast" role="status" aria-live="polite"></div>
+
+    <nav class="tabbar" aria-label="Secciones principales">
+      <button class="tab-button active" type="button" data-tab="inicio">Inicio</button>
+      <button class="tab-button" type="button" data-tab="servicios">Servicios</button>
+      <button class="tab-button" type="button" data-tab="manual">Manual</button>
+      <button class="tab-button" type="button" data-tab="mas">Mas</button>
+    </nav>
+
+    <script type="module" src="app.js"></script>
+  </body>
+</html>

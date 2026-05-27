@@ -1,0 +1,16 @@
+{
+  "name": "Control Planta iGen5000",
+  "short_name": "iGen5000",
+  "start_url": ".",
+  "display": "standalone",
+  "background_color": "#f4f8fc",
+  "theme_color": "#005eb8",
+  "icons": [
+    {
+      "src": "icon.svg",
+      "sizes": "512x512",
+      "type": "image/svg+xml",
+      "purpose": "any maskable"
+    }
+  ]
+}
