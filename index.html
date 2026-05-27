@@ -15,7 +15,7 @@
         <p class="eyebrow">Westinghouse iGen5000</p>
         <h1>Control de planta</h1>
       </div>
-      <div class="status-pill" id="saveStatus">Modo local provisional</div>
+      <div class="status-pill" id="saveStatus">Local</div>
     </header>
 
     <main class="app-shell">
@@ -166,8 +166,30 @@
         <article class="panel">
           <div class="section-title">
             <div>
+              <p class="eyebrow">Nube</p>
+              <h2>Sincronización</h2>
+            </div>
+            <span id="cloudStatus" class="status-pill mini">Sin nube</span>
+          </div>
+          <form id="cloudForm" class="cloud-form">
+            <label>
+              Clave familiar
+              <input id="cloudKeyInput" type="password" autocomplete="new-password" placeholder="La misma clave en los dos iPhone">
+            </label>
+            <button type="submit">Activar nube</button>
+          </form>
+          <div class="backup-actions">
+            <button id="cloudSyncNowBtn" class="ghost-button hidden" type="button">Sincronizar ahora</button>
+            <button id="cloudDisconnectBtn" class="ghost-button hidden" type="button">Quitar nube de este teléfono</button>
+          </div>
+          <p class="fine-print">Usa la misma clave en ambos teléfonos. La clave no se muestra ni se sube al código público.</p>
+        </article>
+
+        <article class="panel">
+          <div class="section-title">
+            <div>
               <p class="eyebrow">Respaldo</p>
-              <h2>Registro provisional</h2>
+              <h2>Registro</h2>
             </div>
           </div>
           <div class="backup-actions">
@@ -180,7 +202,7 @@
             <button id="resetBtn" class="danger" type="button">Reiniciar</button>
             <button id="editModeBtn" class="ghost-button" type="button">Edición</button>
           </div>
-          <p class="fine-print">Los datos se guardan en este dispositivo. Usa exportar/importar para respaldar o mover el registro.</p>
+          <p class="fine-print">Exportar e importar queda como respaldo manual adicional.</p>
         </article>
       </section>
     </main>

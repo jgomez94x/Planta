@@ -1,4 +1,10 @@
+import { createClient } from "@supabase/supabase-js";
+
 const STORAGE_KEY = "planta-igen5000-registro-v3";
+const CLOUD_KEY_STORAGE = "planta-igen5000-cloud-key";
+const SUPABASE_URL = "https://eayaqiqgplvwrxcvxrkn.supabase.co";
+const SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImVheWFxaXFncGx2d3J4Y3Z4cmtuIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Nzc5MTY5NTcsImV4cCI6MjA5MzQ5Mjk1N30.oi-Zeg8s2B6Or-GohZD4FadFvGnqRESpbXVKnStf8j4";
+const CLOUD_TABLE = "planta_sync_states";
 
 const maintenanceRules = [
   {
@@ -314,6 +320,13 @@ const defaultState = {
 let state = loadState();
 let editMode = false;
 let editTapCount = 0;
+let cloudKeyHash = localStorage.getItem(CLOUD_KEY_STORAGE) || "";
+let cloudClient = cloudKeyHash ? createCloudClient(cloudKeyHash) : null;
+let cloudReady = false;
+let cloudSaving = false;
+let cloudSaveTimer = null;
+let lastCloudUpdatedAt = "";
+let cloudWatchStarted = false;
 
 const $ = (selector) => document.querySelector(selector);
 const daysBetween = (a, b) => Math.floor((b - a) / 86400000);
@@ -362,14 +375,168 @@ function loadState() {
   }
 }
 
-function saveState() {
+function saveLocalStateOnly() {
   localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
-  $("#saveStatus").textContent = "Provisional " + new Intl.DateTimeFormat("es-VE", {
+}
+
+function updateSaveStatus(message) {
+  const status = $("#saveStatus");
+  if (!status) return;
+  status.textContent = message;
+}
+
+function localTimeLabel() {
+  return new Intl.DateTimeFormat("es-VE", {
     timeZone: "America/Caracas",
     hour: "numeric",
     minute: "2-digit",
     hour12: true
   }).format(new Date());
+}
+
+function saveState() {
+  saveLocalStateOnly();
+  if (cloudKeyHash) {
+    updateSaveStatus(`Guardando nube ${localTimeLabel()}`);
+    scheduleCloudSave();
+  } else {
+    updateSaveStatus(`Local ${localTimeLabel()}`);
+  }
+}
+
+function createCloudClient(appKeyHash) {
+  return createClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
+    global: {
+      headers: {
+        "x-planta-key": appKeyHash
+      }
+    },
+    auth: {
+      persistSession: false,
+      autoRefreshToken: false,
+      detectSessionInUrl: false
+    }
+  });
+}
+
+async function hashSyncKey(value) {
+  const normalized = value.trim();
+  const bytes = new TextEncoder().encode(normalized);
+  const digest = await crypto.subtle.digest("SHA-256", bytes);
+  return [...new Uint8Array(digest)]
+    .map((byte) => byte.toString(16).padStart(2, "0"))
+    .join("");
+}
+
+function normalizeCloudState(data) {
+  return {
+    ...structuredClone(defaultState),
+    ...data,
+    logs: Array.isArray(data?.logs) ? data.logs : [],
+    services: Array.isArray(data?.services) ? data.services : []
+  };
+}
+
+function scheduleCloudSave() {
+  window.clearTimeout(cloudSaveTimer);
+  cloudSaveTimer = window.setTimeout(() => {
+    pushCloudState();
+  }, 700);
+}
+
+async function pushCloudState() {
+  if (!cloudClient || !cloudKeyHash || cloudSaving) return;
+  cloudSaving = true;
+  const updatedAt = new Date().toISOString();
+  const { error } = await cloudClient
+    .from(CLOUD_TABLE)
+    .upsert({
+      app_key: cloudKeyHash,
+      data: state,
+      updated_at: updatedAt
+    }, { onConflict: "app_key" });
+
+  cloudSaving = false;
+  if (error) {
+    console.error(error);
+    updateCloudStatus("Error de nube. Revisa conexión.");
+    updateSaveStatus(`Pendiente nube ${localTimeLabel()}`);
+    return;
+  }
+  cloudReady = true;
+  lastCloudUpdatedAt = updatedAt;
+  updateCloudStatus("Sincronización activa");
+  updateSaveStatus(`Nube ${localTimeLabel()}`);
+}
+
+async function pullCloudState(showToastOnUpdate = false) {
+  if (!cloudClient || !cloudKeyHash || cloudSaving) return;
+  const { data, error } = await cloudClient
+    .from(CLOUD_TABLE)
+    .select("data, updated_at")
+    .eq("app_key", cloudKeyHash)
+    .maybeSingle();
+
+  if (error) {
+    console.error(error);
+    updateCloudStatus("No se pudo leer la nube.");
+    return;
+  }
+
+  if (!data) {
+    await pushCloudState();
+    return;
+  }
+
+  if (data.updated_at && data.updated_at !== lastCloudUpdatedAt) {
+    state = normalizeCloudState(data.data);
+    lastCloudUpdatedAt = data.updated_at;
+    saveLocalStateOnly();
+    render();
+    if (showToastOnUpdate) showToast("Datos actualizados desde la nube");
+  }
+
+  cloudReady = true;
+  updateCloudStatus("Sincronización activa");
+  updateSaveStatus(`Nube ${localTimeLabel()}`);
+}
+
+async function connectCloudWithKey(rawKey) {
+  if (!rawKey.trim()) {
+    showToast("Escribe una clave de sincronización");
+    return;
+  }
+  updateCloudStatus("Conectando...");
+  cloudKeyHash = await hashSyncKey(rawKey);
+  localStorage.setItem(CLOUD_KEY_STORAGE, cloudKeyHash);
+  cloudClient = createCloudClient(cloudKeyHash);
+  startCloudWatch();
+  await pullCloudState(true);
+  renderCloudControls();
+}
+
+function disconnectCloud() {
+  cloudKeyHash = "";
+  cloudClient = null;
+  cloudReady = false;
+  lastCloudUpdatedAt = "";
+  localStorage.removeItem(CLOUD_KEY_STORAGE);
+  updateSaveStatus(`Local ${localTimeLabel()}`);
+  updateCloudStatus("Sin nube");
+  renderCloudControls();
+  showToast("Sincronización desactivada en este dispositivo");
+}
+
+function updateCloudStatus(message) {
+  const status = $("#cloudStatus");
+  if (status) status.textContent = message;
+}
+
+function startCloudWatch() {
+  if (cloudWatchStarted) return;
+  cloudWatchStarted = true;
+  window.setInterval(() => pullCloudState(), 30000);
+  window.addEventListener("focus", () => pullCloudState(true));
 }
 
 function freshState() {
@@ -449,6 +616,7 @@ function render() {
   renderSymptomButtons();
   renderUsageHistory();
   renderServiceHistory();
+  renderCloudControls();
   renderSearch();
   renderEditMode();
 }
@@ -457,6 +625,27 @@ function renderEditMode() {
   document.body.classList.toggle("edit-mode", editMode);
   const button = $("#editModeBtn");
   if (button) button.textContent = editMode ? "Salir edición" : "Edición";
+}
+
+function renderCloudControls() {
+  const status = $("#cloudStatus");
+  const cloudForm = $("#cloudForm");
+  const disconnectButton = $("#cloudDisconnectBtn");
+  const syncNowButton = $("#cloudSyncNowBtn");
+  if (!status || !cloudForm || !disconnectButton || !syncNowButton) return;
+
+  cloudForm.classList.toggle("hidden", Boolean(cloudKeyHash));
+  disconnectButton.classList.toggle("hidden", !cloudKeyHash);
+  syncNowButton.classList.toggle("hidden", !cloudKeyHash);
+
+  if (!cloudKeyHash) {
+    status.textContent = "Sin nube";
+    updateSaveStatus(`Local ${localTimeLabel()}`);
+  } else if (!cloudReady) {
+    status.textContent = "Conectando...";
+  } else if (!cloudSaving) {
+    status.textContent = "Sincronización activa";
+  }
 }
 
 function renderActivePerson() {
@@ -921,6 +1110,23 @@ $("#importInput").addEventListener("change", async (event) => {
   render();
 });
 
+$("#cloudForm").addEventListener("submit", async (event) => {
+  event.preventDefault();
+  await connectCloudWithKey($("#cloudKeyInput").value);
+  $("#cloudKeyInput").value = "";
+});
+
+$("#cloudSyncNowBtn").addEventListener("click", async () => {
+  await pullCloudState(true);
+  await pushCloudState();
+  showToast("Sincronización revisada");
+});
+
+$("#cloudDisconnectBtn").addEventListener("click", () => {
+  if (!confirm("¿Quitar la nube de este teléfono? Los datos en Supabase no se borran.")) return;
+  disconnectCloud();
+});
+
 $("#resetBtn").addEventListener("click", () => {
   if (!confirm("¿Seguro que quieres borrar el registro de esta planta en este navegador?")) return;
   resetLocalState();
@@ -931,6 +1137,11 @@ $("#demoResetBtn").addEventListener("click", () => {
 });
 
 render();
+
+if (cloudKeyHash) {
+  startCloudWatch();
+  pullCloudState();
+}
 
 if ("serviceWorker" in navigator) {
   navigator.serviceWorker.register("service-worker.js").catch(() => {});
